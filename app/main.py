@@ -7,17 +7,19 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Calculator API", version="1.0.0")
 
+OpType = Literal["add", "sub", "mul", "div"]
+
 
 class CalcRequest(BaseModel):
-    op: Literal["add", "sub", "mul", "div"] = Field(
+    op: OpType = Field(
         ..., description="Operation: add, sub, mul, div"
     )
-    a: float = Field(..., description="Left operand")
-    b: float = Field(..., description="Right operand")
+    a: float = Field(..., description="Left operand", allow_inf_nan=False)
+    b: float = Field(..., description="Right operand", allow_inf_nan=False)
 
 
 class CalcResponse(BaseModel):
-    op: str
+    op: OpType
     a: float
     b: float
     result: float
