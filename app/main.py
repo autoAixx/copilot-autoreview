@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import math
+from typing import Literal
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, Field
+
+app = FastAPI(title="Calculator API", version="1.0.0")
+
+OpType = Literal["add", "sub", "mul", "div"]
+
+
+class CalcRequest(BaseModel):
+    op: OpType = Field(
+        ..., description="Operation: add, sub, mul, div"
+    )
+    a: float = Field(..., description="Left operand", allow_inf_nan=False)
+    b: float = Field(..., description="Right operand", allow_inf_nan=False)
+
+
+class CalcResponse(BaseModel):
+    op: OpType
+    a: float
+    b: float
+    result: float = Field(..., allow_inf_nan=False)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post("/calculate", response_model=CalcResponse)
+def calculate(payload: CalcRequest) -> CalcResponse:
+    if payload.op == "add":
+        result = payload.a + payload.b
+    elif payload.op == "sub":
+        result = payload.a - payload.b
+    elif payload.op == "mul":
+        result = payload.a * payload.b
+    else:
+        if payload.b == 0:
+            raise HTTPException(status_code=400, detail="Division by zero")
+        result = payload.a / payload.b
+
+    if not math.isfinite(result):
+        raise HTTPException(status_code=400, detail="Result is not finite")
+
+    return CalcResponse(op=payload.op, a=payload.a, b=payload.b, result=result)

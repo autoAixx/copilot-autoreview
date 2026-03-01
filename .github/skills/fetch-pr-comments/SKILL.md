@@ -7,10 +7,11 @@ description: Fetches inline GitHub PR review comments for the current branch and
 
 Produces `pr_comments.json` in the repo root with the structure:
 ```json
-[{ "file": "src/foo.ts", "line": 42, "comment": "..." }, ...]
+[{ "id": 123456789, "file": "src/foo.ts", "line": 42, "comment": "..." }, ...]
 ```
 
-`line` is the line number in the file the comment was left on (`null` if GitHub did not provide one).
+- `id` — GitHub's numeric comment ID (used by the `resolve-pr-threads` skill to look up and resolve threads).
+- `line` — line number in the file the comment was left on (`null` if GitHub did not provide one).
 
 ## Run the script
 
