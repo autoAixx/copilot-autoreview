@@ -15,7 +15,7 @@ const OP_MAP = OP_DEFS.reduce((map, def) => {
     map[name] = def.fn;
   });
   return map;
-}, {});
+}, Object.create(null));
 
 const DIV_OPS = new Set(
   OP_DEFS.filter((def) => def.isDivision)
@@ -43,9 +43,10 @@ app.get("/health", (req, res) => {
 app.post("/calculate", (req, res) => {
   const { op, a, b } = req.body || {};
   const operator = typeof op === "string" ? op.toLowerCase() : "";
-  const fn = OP_MAP[operator];
+  const hasOp = Object.hasOwn(OP_MAP, operator);
+  const fn = hasOp ? OP_MAP[operator] : null;
 
-  if (!fn) {
+  if (!hasOp || typeof fn !== "function") {
     return res.status(400).json({
       error: `Invalid op. Use one of: ${ALLOWED_OPS.join("|")}`
     });
@@ -75,7 +76,14 @@ app.use((err, req, res, next) => {
   return res.status(500).json({ error: "Internal server error." });
 });
 
-const port = Number(process.env.PORT) || 3000;
+const envPort = process.env.PORT;
+let port = 3000;
+if (envPort !== undefined && envPort !== "") {
+  const parsedPort = Number(envPort);
+  if (Number.isFinite(parsedPort)) {
+    port = parsedPort;
+  }
+}
 app.listen(port, () => {
   console.log(`Calculator API running on http://localhost:${port}`);
 });
