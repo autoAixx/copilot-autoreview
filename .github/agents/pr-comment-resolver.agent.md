@@ -85,7 +85,27 @@ If it exists, read and follow it. If tests **fail**:
 
 ---
 
-## Step 7 — Clean up
+## Step 7 — Commit and push (if build and tests passed)
+
+If **both** build and tests passed (or were skipped), ask the user with `AskQuestion` tool:
+
+> "Everything looks good. Do you want me to commit the changes and push to the remote branch?"
+
+Options: **"Yes, commit and push"** / **"No, I'll handle it"**
+
+If the user selects **"Yes, commit and push"**:
+
+1. Stage all modified files: `git add <modified files>`
+2. Commit with a message summarising the resolved comments, e.g.:
+   `git commit -m "fix: resolve PR review comments"`
+3. Push to the current branch: `git push`
+4. Note the outcome (success or any error) in the report.
+
+If build or tests are **failing**, skip this step entirely — do not commit or push.
+
+---
+
+## Step 8 — Clean up
 
 Delete any temporary files created during this workflow before reporting:
 - `pr_comments.json`
@@ -93,7 +113,7 @@ Delete any temporary files created during this workflow before reporting:
 
 ---
 
-## Step 8 — Report to the user
+## Step 9 — Report to the user
 
 ```
 ## PR Comment Resolution Report
@@ -105,6 +125,7 @@ Delete any temporary files created during this workflow before reporting:
 
 **Build:** ✅ passing  /  ❌ failing  /  ⏭ skipped
 **Tests:** ✅ all passing  /  ❌ N failing  /  ⏭ skipped
+**Commit & push:** ✅ pushed  /  ⏭ skipped (user declined)  /  ⏭ skipped (build/tests failing)
 
 **Modified files:**
 - src/foo.ts
