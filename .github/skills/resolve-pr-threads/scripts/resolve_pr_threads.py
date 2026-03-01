@@ -26,10 +26,10 @@ def run(cmd):
 
 
 THREADS_QUERY = """
-query($owner: String!, $repo: String!, $pr: Int!) {
+query($owner: String!, $repo: String!, $pr: Int!, $after: String) {
     repository(owner: $owner, name: $repo) {
         pullRequest(number: $pr) {
-            reviewThreads(first: 100) {
+            reviewThreads(first: 100, after: $after) {
                 nodes {
                     id
                     isResolved
@@ -37,7 +37,33 @@ query($owner: String!, $repo: String!, $pr: Int!) {
                         nodes {
                             databaseId
                         }
+                        pageInfo {
+                            endCursor
+                            hasNextPage
+                        }
                     }
+                }
+                pageInfo {
+                    endCursor
+                    hasNextPage
+                }
+            }
+        }
+    }
+}
+"""
+
+THREAD_COMMENTS_QUERY = """
+query($threadId: ID!, $after: String) {
+    node(id: $threadId) {
+        ... on PullRequestReviewThread {
+            comments(first: 100, after: $after) {
+                nodes {
+                    databaseId
+                }
+                pageInfo {
+                    endCursor
+                    hasNextPage
                 }
             }
         }
@@ -147,7 +173,14 @@ def get_current_pr_number_via_api(owner, repo, token):
 def load_comment_ids(args):
     """Return set of comment database IDs to resolve."""
     if args:
-        return {int(i) for i in args}
+        ids = set()
+        for i in args:
+            try:
+                ids.add(int(i))
+            except ValueError:
+                print(f"ERROR: Invalid comment ID '{i}'. Expected an integer.", file=sys.stderr)
+                sys.exit(1)
+        return ids
     try:
         with open("pr_comments.json", encoding="utf-8") as f:
             comments = json.load(f)
@@ -161,27 +194,78 @@ def load_comment_ids(args):
     return ids
 
 
+def fetch_review_threads(owner, repo, pr_number, gh_available, token):
+    """Return all review threads for a PR, handling pagination."""
+    threads = []
+    after = None
+    while True:
+        variables = {"owner": owner, "repo": repo, "pr": int(pr_number), "after": after}
+        result, err = graphql_request(THREADS_QUERY, variables, gh_available, token)
+        if not result:
+            print(f"ERROR: Failed to fetch review threads: {err}", file=sys.stderr)
+            sys.exit(1)
+
+        review_threads = (
+            result.get("data", {})
+            .get("repository", {})
+            .get("pullRequest", {})
+            .get("reviewThreads", {})
+        )
+
+        nodes = review_threads.get("nodes", [])
+        threads.extend(nodes)
+
+        page_info = review_threads.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            break
+        after = page_info.get("endCursor")
+    return threads
+
+
+def fetch_thread_comments(thread_id, gh_available, token, after=None):
+    """Return all comments for a review thread, handling pagination."""
+    comments = []
+    cursor = after
+    while True:
+        variables = {"threadId": thread_id, "after": cursor}
+        result, err = graphql_request(THREAD_COMMENTS_QUERY, variables, gh_available, token)
+        if not result:
+            print(f"ERROR: Failed to fetch thread comments: {err}", file=sys.stderr)
+            sys.exit(1)
+
+        thread_node = (result.get("data", {}) or {}).get("node") or {}
+        comment_data = thread_node.get("comments") or {}
+
+        comments.extend(comment_data.get("nodes", []))
+        page_info = comment_data.get("pageInfo", {})
+        if not page_info.get("hasNextPage"):
+            break
+        cursor = page_info.get("endCursor")
+    return comments
+
+
 def fetch_thread_map(owner, repo, pr_number, gh_available, token):
     """Return dict mapping comment database ID -> thread node ID for unresolved threads."""
-    variables = {"owner": owner, "repo": repo, "pr": int(pr_number)}
-    result, err = graphql_request(THREADS_QUERY, variables, gh_available, token)
-    if not result:
-        print(f"ERROR: Failed to fetch review threads: {err}", file=sys.stderr)
-        sys.exit(1)
-
-    threads = (
-        result.get("data", {})
-        .get("repository", {})
-        .get("pullRequest", {})
-        .get("reviewThreads", {})
-        .get("nodes", [])
-    )
+    threads = fetch_review_threads(owner, repo, pr_number, gh_available, token)
 
     thread_map = {}
     for thread in threads:
         if thread.get("isResolved"):
             continue
-        comment_nodes = (thread.get("comments") or {}).get("nodes", [])
+        comment_data = thread.get("comments") or {}
+        comment_nodes = comment_data.get("nodes", [])
+        page_info = comment_data.get("pageInfo", {})
+
+        if page_info.get("hasNextPage"):
+            comment_nodes.extend(
+                fetch_thread_comments(
+                    thread["id"],
+                    gh_available,
+                    token,
+                    after=page_info.get("endCursor"),
+                )
+            )
+
         for comment in comment_nodes:
             db_id = comment.get("databaseId")
             if db_id:
