@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
@@ -22,7 +23,7 @@ class CalcResponse(BaseModel):
     op: OpType
     a: float
     b: float
-    result: float
+    result: float = Field(..., allow_inf_nan=False)
 
 
 @app.get("/health")
@@ -42,5 +43,8 @@ def calculate(payload: CalcRequest) -> CalcResponse:
         if payload.b == 0:
             raise HTTPException(status_code=400, detail="Division by zero")
         result = payload.a / payload.b
+
+    if not math.isfinite(result):
+        raise HTTPException(status_code=400, detail="Result is not finite")
 
     return CalcResponse(op=payload.op, a=payload.a, b=payload.b, result=result)

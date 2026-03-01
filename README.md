@@ -22,7 +22,9 @@ pip install -r requirements.txt
 
 ## Run
 
-```powershell
+Works on Windows, Linux, and macOS:
+
+```bash
 uvicorn app.main:app --reload
 ```
 
