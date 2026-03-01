@@ -99,9 +99,10 @@ If the user selects **"Yes, commit and push"**:
 2. Commit with a message summarising the resolved comments, e.g.:
    `git commit -m "fix: resolve PR review comments"`
 3. Push to the current branch: `git push`
-4. Note the outcome (success or any error) in the report.
+4. If the push succeeds, read and follow `.github/skills/resolve-pr-threads/SKILL.md` to mark the resolved threads on GitHub.
+5. Note the outcome (push + thread resolution success or any errors) in the report.
 
-If build or tests are **failing**, skip this step entirely — do not commit or push.
+If build or tests are **failing**, skip this step entirely — do not commit, push, or resolve threads.
 
 ---
 
@@ -126,6 +127,7 @@ Delete any temporary files created during this workflow before reporting:
 **Build:** ✅ passing  /  ❌ failing  /  ⏭ skipped
 **Tests:** ✅ all passing  /  ❌ N failing  /  ⏭ skipped
 **Commit & push:** ✅ pushed  /  ⏭ skipped (user declined)  /  ⏭ skipped (build/tests failing)
+**Threads resolved:** ✅ N resolved  /  ❌ N failed  /  ⏭ skipped
 
 **Modified files:**
 - src/foo.ts

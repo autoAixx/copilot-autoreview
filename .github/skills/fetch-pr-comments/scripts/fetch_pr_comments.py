@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Fetch inline PR review comments for the current branch.
-Outputs pr_comments.json with [{file, comment}] in the repo root.
+Outputs pr_comments.json with [{id, file, line, comment}] in the repo root.
 
 Priority: gh CLI -> GitHub REST API (GITHUB_TOKEN)
 """
@@ -21,13 +21,23 @@ def run(cmd):
 
 def get_pr_info_via_gh():
     """Returns (owner, repo, pr_number) using gh CLI."""
-    code, out, _ = run("gh pr view --json number,headRepository --jq \".number,.headRepository.owner.login,.headRepository.name\"")
+    code, out, _ = run("gh repo view --json owner,name --jq \"{owner:.owner.login,repo:.name}\"")
     if code != 0:
         return None
-    parts = out.splitlines()
-    if len(parts) < 3:
+    try:
+        data = json.loads(out)
+        owner = data.get("owner", "")
+        repo = data.get("repo", "")
+    except Exception:
         return None
-    return parts[1], parts[2], parts[0]
+
+    code, number, _ = run("gh pr view --json number --jq .number")
+    if code != 0 or not number:
+        return None
+
+    if not owner or not repo:
+        return None
+    return owner, repo, number.strip()
 
 
 def get_pr_info_via_git():
@@ -95,7 +105,7 @@ def parse_comments(raw):
         if key in seen:
             continue
         seen.add(key)
-        entry = {"file": path, "line": line, "comment": body}
+        entry = {"id": c.get("id"), "file": path, "line": line, "comment": body}
         result.append(entry)
     return result
 
