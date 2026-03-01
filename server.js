@@ -3,16 +3,25 @@ const express = require("express");
 const app = express();
 app.use(express.json({ limit: "64kb" }));
 
-const OP_MAP = {
-  add: (a, b) => a + b,
-  sum: (a, b) => a + b,
-  sub: (a, b) => a - b,
-  subtract: (a, b) => a - b,
-  mul: (a, b) => a * b,
-  multiply: (a, b) => a * b,
-  div: (a, b) => a / b,
-  divide: (a, b) => a / b
-};
+const OP_DEFS = [
+  { names: ["add", "sum"], fn: (a, b) => a + b },
+  { names: ["sub", "subtract"], fn: (a, b) => a - b },
+  { names: ["mul", "multiply"], fn: (a, b) => a * b },
+  { names: ["div", "divide"], fn: (a, b) => a / b, isDivision: true }
+];
+
+const OP_MAP = OP_DEFS.reduce((map, def) => {
+  def.names.forEach((name) => {
+    map[name] = def.fn;
+  });
+  return map;
+}, {});
+
+const DIV_OPS = new Set(
+  OP_DEFS.filter((def) => def.isDivision)
+    .flatMap((def) => def.names)
+);
+const ALLOWED_OPS = Object.keys(OP_MAP);
 
 function parseNumber(value) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -38,7 +47,7 @@ app.post("/calculate", (req, res) => {
 
   if (!fn) {
     return res.status(400).json({
-      error: "Invalid op. Use add|sub|mul|div (or sum|subtract|multiply|divide)."
+      error: `Invalid op. Use one of: ${ALLOWED_OPS.join("|")}`
     });
   }
 
@@ -51,7 +60,7 @@ app.post("/calculate", (req, res) => {
     });
   }
 
-  if ((operator === "div" || operator === "divide") && right === 0) {
+  if (DIV_OPS.has(operator) && right === 0) {
     return res.status(400).json({ error: "Division by zero." });
   }
 
